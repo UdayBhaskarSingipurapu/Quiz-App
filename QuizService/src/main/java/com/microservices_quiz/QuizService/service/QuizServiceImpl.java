@@ -7,6 +7,7 @@ import com.microservices_quiz.QuizService.feignclients.QuestionFeign;
 import com.microservices_quiz.QuizService.model.Quiz;
 import com.microservices_quiz.QuizService.model.SubmitResponse;
 import com.microservices_quiz.QuizService.repository.QuizRepository;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,10 @@ public class QuizServiceImpl implements QuizService {
     @Autowired
     QuestionFeign questionFeign;
 
+    private static final String CIRCUIT_BREAKER_NAME = "questionFeignCircuitBreaker";
+
     @Override
+    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "createQuizFallBack")
     public String createQuiz(String category, int numQ, String title) {
         ResponseEntity<Object> response = questionFeign.generateQuestionsForQuiz(category, numQ);
 
@@ -47,6 +51,7 @@ public class QuizServiceImpl implements QuizService {
     }
 
     @Override
+    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "getQuizQuestionsByIdFallBack")
     public List<QuestionResponseDto> getQuizQuestionsById(Long id) {
         Quiz quiz = quizRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Quiz with id " + id + " does not exist"));
@@ -83,6 +88,7 @@ public class QuizServiceImpl implements QuizService {
 
 
     @Override
+    @CircuitBreaker(name = CIRCUIT_BREAKER_NAME, fallbackMethod = "calculateQuizScoreFallBack")
     public Integer calculateQuizScore(Long id, List<SubmitResponse> submitResponses) {
         ResponseEntity<Object> response = questionFeign.getScoreForQuiz(submitResponses);
 
@@ -96,4 +102,15 @@ public class QuizServiceImpl implements QuizService {
         return score;
     }
 
+    public String createQuizFallBack(String category, int numQ, String title, Throwable ex){
+        return "Fallback: Unable to create quiz, Question Service is temporarily unavailable";
+    }
+
+    public List<QuestionResponseDto> getQuizQuestionsByIdFallBack(Long id, Throwable ex){
+        return new ArrayList<>();
+    }
+
+    public Integer calculateQuizScoreFallBack(Long id, List<SubmitResponse> submitResponses, Throwable ex){
+        return -1;
+    }
 }

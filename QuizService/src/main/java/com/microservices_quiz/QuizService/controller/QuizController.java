@@ -23,14 +23,24 @@ public class QuizController {
     @PostMapping("/create")
     public ResponseEntity<ApiResponse<String>> createQuiz(@Valid @RequestBody QuizRequestDto quizRequestDto){
         String result = quizService.createQuiz(quizRequestDto.getCategory(), quizRequestDto.getNumQ(), quizRequestDto.getTitle());
-        ApiResponse<String> response = new ApiResponse<>(HttpStatus.CREATED, "created", result);
+        ApiResponse<String> response;
+        if(result.toLowerCase().contains("fallback")){
+            response = new ApiResponse<>(HttpStatus.SERVICE_UNAVAILABLE, "Failed", result);
+            return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        response = new ApiResponse<>(HttpStatus.CREATED, "created", result);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
     @GetMapping("/all/{id}")
     public ResponseEntity<ApiResponse<List<QuestionResponseDto>>> getQuizById(@PathVariable Long id){
         List<QuestionResponseDto> quizQuestions = quizService.getQuizQuestionsById(id);
-        ApiResponse<List<QuestionResponseDto>> response = new ApiResponse<>(HttpStatus.OK, "Fetched Data from DB", quizQuestions);
+        ApiResponse<List<QuestionResponseDto>> response;
+        if(quizQuestions.isEmpty()){
+            response = new ApiResponse<>(HttpStatus.SERVICE_UNAVAILABLE, "Failed to fetch, Question Service is temporarily unavailable", quizQuestions);
+            return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        response = new ApiResponse<>(HttpStatus.OK, "Fetched Data from DB", quizQuestions);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -38,7 +48,12 @@ public class QuizController {
     @PostMapping("/submit/{id}")
     public ResponseEntity<ApiResponse<Integer>> getQuizScore(@PathVariable Long id, @RequestBody List<SubmitResponse> submitResponses){
         Integer score = quizService.calculateQuizScore(id, submitResponses);
-        ApiResponse<Integer> response = new ApiResponse<>(HttpStatus.OK, "Score of user", score);
+        ApiResponse<Integer> response;
+        if(score == -1){
+            response = new ApiResponse<>(HttpStatus.SERVICE_UNAVAILABLE, "Failed to fetch, Question Service is temporarily unavailable", score);
+            return new ResponseEntity<>(response, HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        response = new ApiResponse<>(HttpStatus.OK, "Score of user", score);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 }
